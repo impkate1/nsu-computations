@@ -94,18 +94,18 @@ def build_A(n):
 
 
 if __name__ == "__main__":
-    x_sol2 = [2.75, 3.5, 2.75, 3.5, 4.5, 3.5, 2.75, 3.5, 2.75]
-
     n = 30
 
     A = build_A(n)
-    print('A =', A)
+    print('A = ', A)
     b = np.ones(n * n)
-    print('b =', b)
+    print('b = ', b)
 
     solver = SeidelSolver(A, b, tol=1e-12, max_iter=5000)
     solution, iters, diff_hist, residual_hist = solver.solve(return_history=True)
 
-    print("Решение x:", solution)
-    print("Итераций:", iters)
+    print("Невязка: ", residual_hist)
+
+    print("Решение x: ", solution)
+    print("Итераций: ", iters)
     plot_convergence(diff_hist, residual_hist)
