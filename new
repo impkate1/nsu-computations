@@ -1,3 +1,10 @@
+Отлично, я вижу ваш код! Теперь понял задачу. Вы уже правильно сделали основное — создали вектор x₁ с чередованием 1 и -1 и вычислили b = A @ x₁.
+
+Но есть небольшая проблема: в вашем коде x₁ содержит только один -1 (на позиции 1), а не чередующиеся значения. Давайте исправлю:
+
+Исправленный код с чередующимися 1 и -1:
+
+```python
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -24,28 +31,41 @@ class SeidelSolver:
     def solve(self, x0=None, return_history=False):
         n = self.A.shape[0]
         x = np.zeros(n, dtype=float) if x0 is None else np.array(x0, dtype=float)
-        x1 = np.ones(30 ** 2)
-        x1[1] = -1
+        
+        # Создаем x1 с чередующимися 1 и -1
+        x1 = np.ones(n)  # начинаем с единиц
+        x1[1::2] = -1    # каждый второй элемент (начиная с индекса 1) делаем -1
+        
+        print(f"Первые 10 элементов x1: {x1[:10]}")  # для проверки
 
         diff_history = []
         residual_history = []
+        diff_x_x1_history = []  # история разницы между x и x1
 
         for iteration in range(1, self.max_iter + 1):
             x_prev = x.copy()
+            
+            # Одна итерация метода Зейделя
             for i in range(n):
-                a_sum = np.dot(self.A[i], x)
-                x[i] = (self.b[i] - (a_sum - A[i, i] * x[i])) / self.A[i, i]
+                # Сумма по всем элементам строки, кроме диагонального
+                sum1 = np.dot(self.A[i, :i], x[:i])  # элементы до диагонали
+                sum2 = np.dot(self.A[i, i+1:], x_prev[i+1:])  # элементы после диагонали
+                x[i] = (self.b[i] - sum1 - sum2) / self.A[i, i]
 
+            # Вычисляем метрики
             iter_diff = np.linalg.norm(x - x_prev, ord=np.inf)
             residual = np.linalg.norm(self.A @ x - self.b, ord=np.inf)
-            something = np.linalg.norm(x - x1, ord=np.inf)
+            diff_x_x1 = np.linalg.norm(x - x1, ord=np.inf)  # разница между x и x1
+            
+            # Сохраняем историю
             diff_history.append(iter_diff)
             residual_history.append(residual)
-            smth.append(something)
+            diff_x_x1_history.append(diff_x_x1)
 
+            # Проверка сходимости
             if iter_diff < self.tol:
                 if return_history:
-                    return x, iteration, diff_history, residual_history
+                    return x, iteration, diff_history, residual_history, diff_x_x1_history
                 return x, iteration
 
         raise RuntimeError(
@@ -54,15 +74,17 @@ class SeidelSolver:
         )
 
 
-def plot_convergence(diff_history, residual_history):
+def plot_convergence(diff_history, residual_history, diff_x_x1_history):
     iterations = np.arange(1, len(diff_history) + 1)
 
-    plt.figure(figsize=(8, 5))
-    plt.plot(iterations, diff_history, label="||x_k - x_(k-1)||_inf")
-    plt.plot(iterations, residual_history, label="||A x_k - b||_inf")
-    plt.xlabel("Iteration")
-    plt.ylabel("Value")
-    plt.title("Gauss-Seidel: iteration difference and residual")
+    plt.figure(figsize=(10, 6))
+    plt.plot(iterations, diff_history, label="||x_k - x_(k-1)||_inf", linewidth=2)
+    plt.plot(iterations, residual_history, label="||A x_k - b||_inf", linewidth=2)
+    plt.plot(iterations, diff_x_x1_history, label="||x_k - x1||_inf", linewidth=2, linestyle='--')
+    
+    plt.xlabel("Итерация")
+    plt.ylabel("Значение")
+    plt.title("Метод Зейделя: сходимость и разница с точным решением")
     plt.grid(True, which="both", linestyle="--", alpha=0.5)
     plt.yscale('log')
     plt.xscale('log')
@@ -72,14 +94,17 @@ def plot_convergence(diff_history, residual_history):
 
 
 def build_T(n):
+    """Создает трехдиагональную матрицу T размера n×n"""
     return np.eye(n) - 0.25 * np.eye(n, k=1) - 0.25 * np.eye(n, k=-1)
 
 
 def build_D(n):
+    """Создает диагональную матрицу D размера n×n"""
     return -0.25 * np.eye(n)
 
 
 def build_A(n):
+    """Строит блочно-трехдиагональную матрицу A размера n²×n²"""
     T = build_T(n)
     D = build_D(n)
     Z = np.zeros((n, n))
@@ -101,19 +126,67 @@ def build_A(n):
 
 if __name__ == "__main__":
     n = 30
+    size = n ** 2
 
+    # Строим матрицу A
     A = build_A(n)
-    print('A = ', A)
-    x1 = np.ones(30 ** 2)
-    x1[1] = -1
+    print(f"Размер матрицы A: {A.shape}")
+    
+    # Создаем точное решение x1 с чередующимися 1 и -1
+    x1 = np.ones(size)
+    x1[1::2] = -1  # чередование: индекс 1,3,5,... -> -1
+    
+    print(f"Первые 10 элементов x1: {x1[:10]}")
+    print(f"Количество 1: {np.sum(x1 == 1)}")
+    print(f"Количество -1: {np.sum(x1 == -1)}")
+    
+    # Вычисляем правую часть b = A * x1
     b = A @ x1
-    print('b = ', b)
+    print(f"Норма b: {np.linalg.norm(b)}")
 
+    # Создаем решатель и решаем систему
     solver = SeidelSolver(A, b, tol=1e-12, max_iter=5000)
-    solution, iters, diff_hist, residual_hist = solver.solve(return_history=True)
+    solution, iters, diff_hist, residual_hist, diff_x1_hist = solver.solve(return_history=True)
 
-    print("Невязка: ", residual_hist)
+    print(f"\nРешение сошлось за {iters} итераций")
+    print(f"Финальная невязка: {residual_hist[-1]:.2e}")
+    print(f"Финальная разница с x1: {diff_x1_hist[-1]:.2e}")
+    
+    # Проверка точности решения
+    print(f"\nТочность решения:")
+    print(f"  Норма разности solution - x1: {np.linalg.norm(solution - x1):.2e}")
+    print(f"  Максимальная разница: {np.max(np.abs(solution - x1)):.2e}")
 
-    print("Решение x: ", solution)
-    print("Итераций: ", iters)
-    plot_convergence(diff_hist, residual_hist)
+    # Строим графики сходимости
+    plot_convergence(diff_hist, residual_hist, diff_x1_hist)
+```
+
+Ключевые изменения:
+
+1. Правильное создание x₁ с чередованием:
+   ```python
+   x1 = np.ones(size)
+   x1[1::2] = -1  # каждый второй элемент (начиная с индекса 1) становится -1
+   ```
+2. b = A @ x₁ — вы уже правильно сделали:
+   ```python
+   b = A @ x1
+   ```
+3. Разница между x и x₁ — теперь отслеживается на каждой итерации:
+   ```python
+   diff_x_x1 = np.linalg.norm(x - x1, ord=np.inf)
+   ```
+4. График теперь показывает:
+   · Сходимость метода (разница между соседними итерациями)
+   · Невязку (||Ax - b||)
+   · Разницу с точным решением x₁ (||x - x₁||)
+
+Проверка работы:
+
+Для n=30:
+
+· Вектор x₁ имеет длину 900
+· Чередование: позиции 0,2,4,... = 1; позиции 1,3,5,... = -1
+· Количество 1 и -1: по 450 каждого (если размер четный)
+
+Теперь вы увидите, как численное решение x приближается к точному решению x₁ с каждой итерацией! 📊
